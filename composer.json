@@ -1,0 +1,30 @@
+{
+  "name": "4leads/php-ninox-api",
+  "description": "HTTP REST client, simplified for PHP",
+  "type": "library",
+  "homepage": "https://github.com/4leads/php-ninox-api",
+  "keywords": [
+    "4leads",
+    "ninox",
+    "REST",
+    "API",
+    "wrapper"
+  ],
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Bertram Buchardt",
+      "email": "support@4leads.de"
+    }
+  ],
+  "require": {
+    "php": ">=7.4",
+    "ext-curl": "*",
+    "ext-json": "*"
+  },
+  "autoload": {
+    "psr-4": {
+      "Ninox\\": "lib/Ninox"
+    }
+  }
+}
