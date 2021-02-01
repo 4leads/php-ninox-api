@@ -1,11 +1,12 @@
-![4leads Logo](https://s3.eu-central-1.amazonaws.com/public.srvmedia/logoSmall.png)
+# NOT READY TO USE YET - will make release if so (with version 1.0)
+
+![4leads Logo](https://s3.eu-central-1.amazonaws.com/public.srvmedia/logoSmall.png)\
+
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 
 # PHP Ninox REST-API Client/Wrapper
 
 **This libary allows you to quickly and easily perform REST actions on the Ninox backend using PHP.**
-
-<a name="installation"></a>
 
 # Installation
 
@@ -26,3 +27,9 @@ manage dependencies in your PHP application.
 ```sh
 composer require 4leads/php-ninox-api
 ```
+
+# Usage
+
+## Set ``team_id`` and/or ``database_id`` static or dynamic
+
+...TODO

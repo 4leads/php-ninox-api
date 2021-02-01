@@ -18,7 +18,6 @@ use stdClass;
 class NinoxClient
 {
     const VERSION = '0.9.0';
-
     const TEAM_ID_VAR = "{TEAM_ID}";
     const DATABASE_ID_VAR = "{DATABASE_ID}";
 
