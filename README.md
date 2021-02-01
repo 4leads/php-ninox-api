@@ -1,4 +1,6 @@
-![4leads Logo](https://s3.eu-central-1.amazonaws.com/public.srvmedia/logoSmall.png)
+# NOT READY TO USE YET - will make release if with version 1.0
+
+![4leads Logo](https://s3.eu-central-1.amazonaws.com/public.srvmedia/logoSmall.png)\
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 
 # PHP Ninox REST-API Client/Wrapper
