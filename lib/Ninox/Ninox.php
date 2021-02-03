@@ -17,7 +17,7 @@ use stdClass;
  */
 class Ninox
 {
-    const VERSION = '1.0.0';
+    const VERSION = '1.0.1';
     const TEAM_ID_VAR = "{TEAM_ID}";
     const DATABASE_ID_VAR = "{DATABASE_ID}";
 
@@ -104,14 +104,17 @@ class Ninox
      */
     private $_databse_id;
 
+    /**
+     * @var bool
+     */
+    protected $isPrivateCloud;
     //END Client properties
 
 
     /**
      * Setup the HTTP Client
-     *
-     * @param string $apiKey your 4leads API Key.
      * @param array $options an array of options, currently only "host" and "curl" are implemented.
+     * @param string $apiKey your 4leads API Key.
      * @param null|string $team_id set a fixed team_id optionally for all requests
      */
     public function __construct($apiKey, ?array $options = [], ?string $team_id = null)
@@ -122,19 +125,43 @@ class Ninox
             'Accept: application/json',
         ];
 
-        //override if set
+        $publicHost = 'api.ninoxdb.de';
+        $host = isset($options['host']) ? $options['host'] : $publicHost;
+
+        //detect private cloud systems or on premise systems
+        $this->isPrivateCloud = strpos($host, $publicHost) === false;
+        $this->filterHost($host);
+
+        //override if set otherwise keep current global
         self::$team_id = $team_id ? $team_id : self::$team_id;
 
-        $host = isset($options['host']) ? $options['host'] : 'https://api.ninoxdb.de/v1';
-
         $curlOptions = isset($options['curl']) ? $options['curl'] : null;
-        $this->setupClient($host, $headers, null, null, $curlOptions);
+        $this->setupClient($host, $headers, isset($options['version']) ? $options['version'] : null, null, $curlOptions);
+    }
+
+    protected function filterHost(string &$host): string
+    {
+        $host = trim($host, '/ ');
+        $host = preg_replace('/\/v1$/', "", $host); //remove version (should be in options)
+        if ($this->isPrivateCloud) {
+            preg_match('/\/([a-zA-Z0-9]+)\/api(\/v1)?/', $host, $matches);
+            if (count($matches) > 1) {
+                $host = str_replace($matches[0], "", $host);
+                //read teamid and set globally if given
+                self::setFixTeam($matches[1]);
+            }
+        }
+        if (strpos($host, 'http') !== 0) {
+            //fallback for missing protocol
+            $host = "https://" . $host;
+        }
+        return $host;
     }
 
     /**
      * Initialize the client
      *
-     * @param string $host the base url (e.g. https://api.4leads.net)
+     * @param string $host the base url (e.g. https://api.ninoxdb.com)
      * @param array $headers global request headers
      * @param string $version api version (configurable) - this is specific to the 4leads API
      * @param array $path holds the segments of the url path
@@ -144,7 +171,7 @@ class Ninox
     {
         $this->host = $host;
         $this->headers = $headers ?: [];
-        $this->version = $version;
+        $this->version = $version ? "/" . trim($version, "/ ") : "/v1";
         $this->path = $path ?: [];
         $this->curlOptions = $curlOptions ?: [];
     }
@@ -161,13 +188,23 @@ class Ninox
         if (isset($queryParams) && is_array($queryParams) && count($queryParams)) {
             $path .= '?' . http_build_query($queryParams);
         }
+        //fix privateCloud/on-premise
+        if ($this->isPrivateCloud) {
+            $path = str_replace("/teams/" . self::TEAM_ID_VAR, "/" . self::TEAM_ID_VAR . "/api" . $this->version, $path);
+        }
+
         //replace fixed or current team and database
         $team_id = strlen($this->_team_id) ? $this->_team_id : self::$team_id;
         $database_id = strlen($this->_databse_id) ? $this->_databse_id : self::$database_id;
         $path = strlen($team_id) ? str_replace(self::TEAM_ID_VAR, urlencode($team_id), $path) : $path;
         $path = strlen($database_id) ? str_replace(self::DATABASE_ID_VAR, urlencode($database_id), $path) : $path;
 
-        return sprintf('%s%s%s', $this->host, $this->version ?: '', $path);
+        if ($this->isPrivateCloud) {
+            //version included in path
+            return sprintf('%s%s', $this->host, $path);
+        } else {
+            return sprintf('%s%s%s', $this->host, $this->version, $path);
+        }
     }
 
     /**
@@ -551,6 +588,9 @@ class Ninox
      */
     public function validateKey()
     {
+        if ($this->isPrivateCloud) {
+            return $this->listDatabases()->isOK();
+        }
         return $this->listTeams()->isOK();
     }
 

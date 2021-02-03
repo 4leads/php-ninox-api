@@ -46,8 +46,14 @@ $client->listTables("databseId3");
 
 ```php
 use Ninox\Ninox;
-$client = new Ninox("API_KEY",["host" => "https://yourprivate.host.com/v1"]);
+$client = new Ninox("API_KEY",["host" => "yourprivate.host.com"]);
+//or
+$client = new Ninox("API_KEY",["host" => "yourprivate.host.com/TEAMID/api/v1"]);
+//or
+$client = new Ninox("API_KEY",["host" => "yourprivate.host.com"], "TEAMID");
 ```
+On private-cloud/on-premise endpoints the call ``listTeams`` is not available. It is advised to set the teamid on construct, which will be used as
+global setting.
 
 ### File Up-/Downloads
 
