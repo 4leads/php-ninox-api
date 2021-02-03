@@ -15,9 +15,9 @@ use stdClass;
  * Interface to the Ninox REST-API
  *
  */
-class NinoxClient
+class Ninox
 {
-    const VERSION = '0.9.0';
+    const VERSION = '1.0.0';
     const TEAM_ID_VAR = "{TEAM_ID}";
     const DATABASE_ID_VAR = "{DATABASE_ID}";
 
@@ -30,8 +30,29 @@ class NinoxClient
     const QUERY_UPDATED = "updated";
     const QUERY_SINCE_ID = "sinceId"; //id larger than
     const QUERY_SINCE_SQ = "sinceSq"; // sequence number lager than
+    const QUERY_IDS = "ids";
+    const QUERY_CHOICE_TYPE = "choice style";
     const QUERY_FILTERS = "filters";
     //<---END NINOX QUERY-Params list
+
+    //NINOX field-types -->
+    const FIELD_TEXT = "text";
+    const FIELD_NUMBER = "number";
+    const FIELD_DATE = "date";
+    const FIELD_DATETIME = "datetime";
+    const FIELD_TIMEINTERVAL = "timeinterval";
+    const FIELD_TIME = "time";
+    const FIELD_APPOINTMENT = "appointment";
+    const FIELD_BOOLEAN = "boolean";
+    const FIELD_CHOICE = "choice";
+    const FIELD_MULTI = "multi"; //not in docs
+    const FIELD_URL = "url";
+    const FIELD_EMAIL = "email";
+    const FIELD_PHONE = "phone";
+    const FIELD_LOCATION = "location";
+    const FIELD_HTML = "html";
+
+    //<--- END Ninox field-types
 
     //Needed Record names
     const METHOD_GET = "GET";
@@ -160,12 +181,14 @@ class NinoxClient
      *
      * @return NinoxResponse|stdClass object
      */
-    public function makeRequest($method, $url, $body = null, $headers = null): NinoxResponse
+    public function makeRequest($method, $url, $body = null, $headers = null, ?array $requestOptions = null): NinoxResponse
     {
         $channel = curl_init($url);
 
         $options = $this->createCurlOptions($method, $body, $headers);
-
+        if ($requestOptions) {
+            $options += $requestOptions;
+        }
         curl_setopt_array($channel, $options);
         $content = curl_exec($channel);
 
@@ -260,7 +283,7 @@ class NinoxClient
      * @param string|null $team_id
      * @return NinoxResponse|stdClass
      */
-    public function listDatabases(?string $team_id): NinoxResponse
+    public function listDatabases(?string $team_id = null): NinoxResponse
     {
         $this->_team_id = $team_id;
         $path = "/teams/" . self::TEAM_ID_VAR . "/databases";
@@ -269,9 +292,11 @@ class NinoxClient
     }
 
     /**
-     * @return NinoxResponse|stdClass
+     * @param string|null $database_id
+     * @param string|null $team_id
+     * @return NinoxResponse
      */
-    public function listTables(?string $database_id, ?string $team_id): NinoxResponse
+    public function listTables(?string $database_id = null, ?string $team_id = null): NinoxResponse
     {
         $this->_databse_id = $database_id;
         $this->_team_id = $team_id;
@@ -281,23 +306,56 @@ class NinoxClient
     }
 
     /**
-     * @param $tableId
+     * @param $table_id
+     * @param string|null $database_id
+     * @param string|null $team_id
+     * @return NinoxResponse
+     */
+    public function getTableInfo($table_id, ?string $database_id = null, ?string $team_id = null): NinoxResponse
+    {
+        $this->_databse_id = $database_id;
+        $this->_team_id = $team_id;
+        $path = "/teams/" . self::TEAM_ID_VAR . "/databases/" . self::DATABASE_ID_VAR . "/tables/" . urlencode($table_id);
+        $url = $this->buildUrl($path, []);
+        return $this->makeRequest(self::METHOD_GET, $url);
+    }
+
+    /**
+     * @param $table_id
      * @param array|null $queryParams
      * @param stdClass|null $filters
      * @param string|null $database_id
      * @param string|null $team_id
      * @return NinoxResponse
      */
-    public function queryRecords($tableId, ?array $queryParams, ?stdClass $filters, ?string $database_id, ?string $team_id): NinoxResponse
+    public function queryRecords($table_id, ?array $queryParams = [], ?stdClass $filters = null, ?string $database_id = null, ?string $team_id = null): NinoxResponse
     {
         $this->_databse_id = $database_id;
         $this->_team_id = $team_id;
         if ($filters) {
             $queryParams[self::QUERY_FILTERS] = json_encode($filters);
         }
-        $path = "/teams/" . self::TEAM_ID_VAR . "/databases/" . self::DATABASE_ID_VAR . "/tables/" . urlencode($tableId) . "/records";
+        $this->filterQueryParams($queryParams);
+        $path = "/teams/" . self::TEAM_ID_VAR . "/databases/" . self::DATABASE_ID_VAR . "/tables/" . urlencode($table_id) . "/records";
         $url = $this->buildUrl($path, $queryParams ? $queryParams : []);
         return $this->makeRequest(self::METHOD_GET, $url);
+    }
+
+    protected function filterQueryParams(array &$queryParams)
+    {
+        //boolean keys
+        $booleans = [
+            "desc",
+            "new",
+            "updated",
+            "ids",
+        ];
+        //cast true or false LIKE values to "true" or "false" string representation
+        foreach ($booleans as $key) {
+            if (array_key_exists($key, $queryParams)) {
+                $queryParams[$key] = $queryParams[$key] ? "true" : "false";
+            }
+        }
     }
 
     /**
@@ -308,13 +366,49 @@ class NinoxClient
      * @param string|null $team_id
      * @return NinoxResponse
      */
-    public function getRecord($tableId, $recordId, ?string $database_id, ?string $team_id): NinoxResponse
+    public function getRecord($tableId, $recordId, ?string $database_id = null, ?string $team_id = null): NinoxResponse
     {
         $this->_databse_id = $database_id;
         $this->_team_id = $team_id;
         $path = "/teams/" . self::TEAM_ID_VAR . "/databases/" . self::DATABASE_ID_VAR . "/tables/" . urlencode($tableId) . "/records/" . urlencode($recordId);
         $url = $this->buildUrl($path, []);
         return $this->makeRequest(self::METHOD_GET, $url);
+    }
+
+
+    /**
+     * @param $tableId
+     * @param $recordId
+     * @param stdClass $fields
+     * @param string|null $database_id
+     * @param string|null $team_id
+     * @return NinoxResponse
+     */
+    public function updateRecord($tableId, $recordId, stdClass $fields, ?string $database_id = null, ?string $team_id = null): NinoxResponse
+    {
+        $upsert = new stdClass();
+        $upsert->id = $recordId;
+        $upsert->fields = $fields;
+        return $this->upsertRecords($tableId, [$upsert], $database_id, $team_id);
+    }
+
+    /**
+     * WITH GREAT POWER COMES GREAT RESPONSIBILITY
+     * @param $queryString
+     * @param string|null $database_id
+     * @param string|null $team_id
+     * @return NinoxResponse
+     */
+    public function evalQuery($queryString, ?string $database_id = null, ?string $team_id = null): NinoxResponse
+    {
+        $this->_databse_id = $database_id;
+        $this->_team_id = $team_id;
+        $path = "/teams/" . self::TEAM_ID_VAR . "/databases/" . self::DATABASE_ID_VAR . "/query";
+        $url = $this->buildUrl($path, []);
+        //build the evil query object
+        $evilObj = new stdClass();
+        $evilObj->query = $queryString;
+        return $this->makeRequest(self::METHOD_POST, $url, $evilObj);
     }
 
     /**
@@ -325,13 +419,88 @@ class NinoxClient
      * @param string|null $team_id
      * @return NinoxResponse
      */
-    public function listRecordFiles($tableId, $recordId, ?string $database_id, ?string $team_id): NinoxResponse
+    public function listRecordFiles($tableId, $recordId, ?string $database_id = null, ?string $team_id = null): NinoxResponse
     {
         $this->_databse_id = $database_id;
         $this->_team_id = $team_id;
         $path = "/teams/" . self::TEAM_ID_VAR . "/databases/" . self::DATABASE_ID_VAR . "/tables/" . urlencode($tableId) . "/records/" . urlencode($recordId) . "/files";
         $url = $this->buildUrl($path, []);
         return $this->makeRequest(self::METHOD_GET, $url);
+    }
+
+    /**
+     * @param $tableId
+     * @param $recordId
+     * @param string $filename
+     * @param int $curlTimeout
+     * @param string|null $database_id
+     * @param string|null $team_id
+     * @return NinoxResponse
+     */
+    public function deleteFile($tableId, $recordId, string $filename, ?string $database_id = null, ?string $team_id = null): NinoxResponse
+    {
+        $this->_databse_id = $database_id;
+        $this->_team_id = $team_id;
+        $path = "/teams/" . self::TEAM_ID_VAR . "/databases/" . self::DATABASE_ID_VAR . "/tables/" . urlencode($tableId) . "/records/" . urlencode($recordId) . "/files/" . urlencode($filename);
+        $url = $this->buildUrl($path, []);
+        return $this->makeRequest(self::METHOD_DELETE, $url);
+    }
+
+    /**
+     * Only tested with small files
+     * @param $tableId
+     * @param $recordId
+     * @param string $filename
+     * @param string $outputFile absolute filename or resource point to write file content to
+     * @param int $curlTimeout
+     * @param string|null $database_id
+     * @param string|null $team_id
+     * @return NinoxResponse
+     * @throws NinoxException
+     */
+    public function downloadFile($tableId, $recordId, string $filename, string $outputFile, int $curlTimeout = 30, ?string $database_id = null, ?string $team_id = null): NinoxResponse
+    {
+        $this->_databse_id = $database_id;
+        $this->_team_id = $team_id;
+        $fp = fopen($outputFile, "w");
+        if (!get_resource_type($fp) == 'file' && get_resource_type($fp) == 'stream') {
+            throw new NinoxException("outputFile is not writable");
+        }
+        $path = "/teams/" . self::TEAM_ID_VAR . "/databases/" . self::DATABASE_ID_VAR . "/tables/" . urlencode($tableId) . "/records/" . urlencode($recordId) . "/files/" . urlencode($filename);
+        $url = $this->buildUrl($path, []);
+        $result = $this->makeRequest(self::METHOD_GET, $url, null, null, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_FILE => $fp,
+            CURLOPT_TIMEOUT => $curlTimeout,
+        ]);
+        fclose($fp);
+        return $result;
+    }
+
+    /**
+     * Only tested with small files
+     * @param $tableId
+     * @param $recordId
+     * @param string $filename
+     * @param int $curlTimeout
+     * @param string|null $database_id
+     * @param string|null $team_id
+     * @return NinoxResponse
+     * @throws NinoxException
+     */
+    public function uploadFile($tableId, $recordId, \CURLFile $file, int $curlTimeout = 60, ?string $database_id = null, ?string $team_id = null): NinoxResponse
+    {
+        $this->_databse_id = $database_id;
+        $this->_team_id = $team_id;
+
+        $path = "/teams/" . self::TEAM_ID_VAR . "/databases/" . self::DATABASE_ID_VAR . "/tables/" . urlencode($tableId) . "/records/" . urlencode($recordId) . "/files/" . urlencode($filename);
+        $url = $this->buildUrl($path, []);
+        //hacky way to overwrite content type (important to use null on body here)
+        $overwrite = $this->createCurlOptions(self::METHOD_DELETE, null, ['Content-Type: multipart/form-data']);
+        $overwrite[CURLOPT_TIMEOUT] = $curlTimeout;
+        $overwrite[CURLOPT_POSTFIELDS] = ["file" => $file];
+        $result = $this->makeRequest(self::METHOD_POST, $url, null, [], $overwrite);
+        return $result;
     }
 
     /**
@@ -342,7 +511,7 @@ class NinoxClient
      * @param string|null $team_id
      * @return NinoxResponse
      */
-    public function deleteRecord($tableId, $recordId, ?string $database_id, ?string $team_id): NinoxResponse
+    public function deleteRecord($tableId, $recordId, ?string $database_id = null, ?string $team_id = null): NinoxResponse
     {
         $this->_databse_id = $database_id;
         $this->_team_id = $team_id;
@@ -359,7 +528,7 @@ class NinoxClient
      * @param string|null $team_id
      * @return NinoxResponse
      */
-    public function upsertRecords($tableId, $upserts, ?string $database_id, ?string $team_id): NinoxResponse
+    public function upsertRecords($tableId, $upserts, ?string $database_id = null, ?string $team_id = null): NinoxResponse
     {
         $this->_databse_id = $database_id;
         $this->_team_id = $team_id;
@@ -448,7 +617,7 @@ class NinoxClient
      *
      * @param array $options
      *
-     * @return NinoxClient
+     * @return Ninox
      */
     public function setCurlOptions(array $options)
     {
