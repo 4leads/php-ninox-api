@@ -17,7 +17,7 @@ use stdClass;
  */
 class Ninox
 {
-    const VERSION = '1.0.1';
+    const VERSION = '1.0.2';
     const TEAM_ID_VAR = "{TEAM_ID}";
     const DATABASE_ID_VAR = "{DATABASE_ID}";
 
@@ -530,7 +530,7 @@ class Ninox
         $this->_databse_id = $database_id;
         $this->_team_id = $team_id;
 
-        $path = "/teams/" . self::TEAM_ID_VAR . "/databases/" . self::DATABASE_ID_VAR . "/tables/" . urlencode($tableId) . "/records/" . urlencode($recordId) . "/files/" . urlencode($filename);
+        $path = "/teams/" . self::TEAM_ID_VAR . "/databases/" . self::DATABASE_ID_VAR . "/tables/" . urlencode($tableId) . "/records/" . urlencode($recordId) . "/files";
         $url = $this->buildUrl($path, []);
         //hacky way to overwrite content type (important to use null on body here)
         $overwrite = $this->createCurlOptions(self::METHOD_DELETE, null, ['Content-Type: multipart/form-data']);
